@@ -1,0 +1,917 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>W4V3 GAMES</title>
+    <!-- Font & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Space+Grotesk:wght@600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* ---------- W4V3 design tokens ---------- */
+        :root {
+            --ink-950: #0A0D13;
+            --ink-900: #12151D;
+            --ink-800: #1B1F2A;
+            --line: #262B3A;
+            --paper: #EDEFF4;
+            --mute: #8891A4;
+            --accent: #38D9C9; /* live default; overridden immediately by the accent script below */
+        }
+
+
+        /* ---------- base & reset ---------- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Inter", system-ui, sans-serif;
+            background: var(--ink-950);
+            min-height: 100vh;
+            color: var(--paper);
+            line-height: 1.5;
+            display: flex;
+            position: relative;
+            overflow: hidden;          /* body never scrolls – container does */
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        body.loaded { opacity: 1; }
+
+
+        /* background crystals — tinted by the active time-of-day accent */
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background-image: 
+                radial-gradient(circle at 10% 20%, color-mix(in srgb, var(--accent) 20%, transparent) 0%, transparent 22%),
+                radial-gradient(circle at 90% 70%, color-mix(in srgb, var(--accent) 14%, transparent) 0%, transparent 26%),
+                radial-gradient(circle at 30% 80%, rgba(255,255,255,0.04) 0%, transparent 30%),
+                radial-gradient(circle at 70% 30%, color-mix(in srgb, var(--accent) 12%, transparent) 0%, transparent 24%),
+                radial-gradient(circle at 50% 50%, rgba(255,255,255,0.02) 0%, transparent 40%);
+            filter: blur(30px);
+            transition: background-image 1s ease;
+        }
+
+
+        /* main container : 61px shorter (for navbar) */
+        .site-container {
+            display: flex;
+            width: 100%;
+            height: calc(100vh - 61px);
+            overflow-y: auto;
+            position: relative;
+            z-index: 2;
+        }
+
+
+        /* glass effect (reusable) */
+        .glass-border {
+            position: relative;
+            border: 1px solid var(--line);
+            box-shadow: 0 0 15px rgba(0,0,0,0.3), inset 0 0 20px rgba(255,255,255,0.05), inset 0 2px 5px rgba(255,255,255,0.25);
+            background: rgba(255,255,255,0.02);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .glass-border::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 30%;
+            background: linear-gradient(135deg, rgba(255,255,255,0.2) 0%, transparent 60%);
+            pointer-events: none;
+            border-radius: inherit;
+        }
+
+
+        /* intro overlay & spinner */
+        .intro-overlay {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--ink-950);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            opacity: 1;
+            visibility: visible;
+            transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+            pointer-events: none;
+        }
+        .intro-overlay.hidden { opacity: 0; visibility: hidden; }
+        .intro-text img {
+            height: 120px;
+            filter: drop-shadow(0 0 30px color-mix(in srgb, var(--accent) 65%, transparent));
+            transition: filter 1s ease;
+            opacity: 0;
+            transform: rotateY(0deg);
+        }
+        @keyframes spinHorizontal {
+            0% { transform: rotateY(0deg); opacity: 0; }
+            20% { opacity: 1; }
+            80% { transform: rotateY(360deg); }
+            100% { transform: rotateY(360deg); opacity: 1; }
+        }
+        .intro-text img.animate { animation: spinHorizontal 1.5s ease-in-out forwards; }
+
+
+        .loading-spinner {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--paper);
+            font-size: 1.2rem;
+            z-index: 10001;
+            background: color-mix(in srgb, var(--ink-900) 88%, transparent);
+            padding: 20px 40px;
+            border-radius: 10px;
+            border: 1px solid var(--line);
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            opacity: 0;
+            transition: opacity 0.3s ease, border-color 0.6s ease;
+            pointer-events: none;
+        }
+        .loading-spinner.show { opacity: 1; }
+        .loading-spinner i { animation: spin 1s linear infinite; color: var(--accent); transition: color 0.6s ease; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+
+        /* blur/darken main content during intro */
+        .intro-active .site-container { filter: blur(4px) brightness(0.5); transition: filter 0.3s ease; }
+
+
+        /* ----- sidebar (layout identical to original — recolored only) ----- */
+        .side-nav {
+            width: 240px;
+            height: 100%;
+            position: sticky;
+            top: 0;
+            padding: 24px 16px;
+            gap: 20px;
+            display: flex;
+            flex-direction: column;
+            background: color-mix(in srgb, var(--ink-900) 60%, transparent);
+            backdrop-filter: blur(12px);
+            border-right: 1px solid var(--line);
+            box-shadow: 5px 0 30px color-mix(in srgb, var(--accent) 8%, transparent);
+            z-index: 50;
+            flex-shrink: 0;
+            transition: box-shadow 0.8s ease;
+        }
+        .nav-header h2 {
+            font-weight: 600;
+            font-size: 1.1rem;
+            letter-spacing: -0.2px;
+            color: var(--paper);
+            margin-bottom: 4px;
+        }
+        .letter-nav {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            justify-content: center;
+            max-height: 350px;
+            overflow-y: auto;
+            padding: 8px 0;
+            scrollbar-width: thin;
+            scrollbar-color: color-mix(in srgb, var(--accent) 40%, transparent) transparent;
+            border-top: 1px solid var(--line);
+            border-bottom: 1px solid var(--line);
+        }
+        .letter-nav::-webkit-scrollbar { width: 4px; }
+        .letter-nav::-webkit-scrollbar-track { background: transparent; }
+        .letter-nav::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--accent) 40%, transparent); border-radius: 4px; }
+        .letter-btn {
+            width: 32px; height: 32px;
+            display: flex; align-items: center; justify-content: center;
+            background: transparent;
+            border: 1px solid var(--line);
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 500; font-size: 0.8rem;
+            color: var(--mute);
+            cursor: pointer; transition: 0.15s;
+            text-transform: uppercase; border-radius: 4px;
+        }
+        .letter-btn:hover {
+            background: color-mix(in srgb, var(--accent) 14%, var(--ink-800));
+            border-color: var(--accent);
+            color: var(--paper);
+            box-shadow: 0 0 12px color-mix(in srgb, var(--accent) 45%, transparent);
+        }
+        .letter-btn.empty-letter { opacity: 0.2; pointer-events: none; border-color: var(--line); }
+
+
+        .search-box {
+            position: relative; width: 100%; margin-top: auto;
+        }
+        .search-box i {
+            position: absolute; left: 12px; top: 50%;
+            transform: translateY(-50%);
+            color: var(--mute); font-size: 0.85rem; pointer-events: none;
+        }
+        .search-box input {
+            width: 100%;
+            background: color-mix(in srgb, var(--ink-900) 60%, transparent);
+            border: 1px solid var(--line);
+            backdrop-filter: blur(8px);
+            border-radius: 6px;
+            padding: 10px 12px 10px 36px;
+            color: var(--paper); font-size: 0.9rem;
+            outline: none; transition: 0.2s;
+        }
+        .search-box input:focus {
+            border-color: var(--accent);
+            background: color-mix(in srgb, var(--accent) 6%, var(--ink-900));
+            box-shadow: 0 0 20px color-mix(in srgb, var(--accent) 35%, transparent);
+        }
+        .search-box input::placeholder { color: var(--mute); font-weight: 300; }
+
+
+        .sidebar-footer { font-size: 0.75rem; color: var(--mute); text-align: center; }
+        .sidebar-footer a { color: var(--mute); text-decoration: none; transition: color 0.2s ease; }
+        .sidebar-footer a:hover { color: var(--accent); }
+
+
+        /* ----- main content area (scroll inside container) ----- */
+        .main-content {
+            flex: 1;
+            padding: 24px 28px;
+            max-width: 1400px;
+            margin: 0 auto;
+            width: 100%;
+            position: relative;
+            z-index: 2;
+            overflow-y: auto;
+            height: 100%;
+        }
+        .main-header {
+            margin-bottom: 28px;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 12px;
+        }
+        .main-header h1 {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.8rem; font-weight: 700; color: var(--paper);
+            letter-spacing: -0.02em;
+            text-shadow: 0 0 18px color-mix(in srgb, var(--accent) 40%, transparent);
+            transition: text-shadow 0.8s ease;
+        }
+        .discord-link {
+            background: color-mix(in srgb, var(--ink-900) 60%, transparent); padding: 8px 16px; border-radius: 6px;
+            border: 1px solid var(--line); backdrop-filter: blur(8px);
+            font-size: 0.9rem; transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .discord-link:hover { border-color: var(--accent); box-shadow: 0 0 14px color-mix(in srgb, var(--accent) 30%, transparent); }
+        .discord-link a { color: var(--paper); text-decoration: none; }
+        .discord-link a:hover { color: var(--accent); }
+
+
+        /* letter sections & game cards */
+        .letter-section {
+            margin-bottom: 28px; border-radius: 10px; padding: 20px 22px;
+            background: color-mix(in srgb, var(--ink-900) 55%, transparent); backdrop-filter: blur(10px);
+            border: 1px solid var(--line);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: border-color 0.6s ease;
+        }
+        .letter-section.hidden-section { display: none; }
+        .letter-header {
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.5rem; font-weight: 600; margin-bottom: 16px; padding-bottom: 8px;
+            border-bottom: 1px solid var(--line); color: var(--paper);
+            display: flex; align-items: center; gap: 12px;
+            text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 35%, transparent);
+            transition: text-shadow 0.8s ease, border-color 0.6s ease;
+        }
+        .letter-header span {
+            background: color-mix(in srgb, var(--accent) 16%, var(--ink-800)); border-radius: 4px; font-size: 0.8rem;
+            padding: 2px 8px; color: var(--accent); font-weight: 500;
+            border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+            font-family: 'JetBrains Mono', monospace;
+            transition: background 0.6s ease, color 0.6s ease, border-color 0.6s ease;
+        }
+        .games-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 6px;
+        }
+        .game-card {
+            background: color-mix(in srgb, var(--ink-900) 55%, transparent); border: 1px solid var(--line);
+            backdrop-filter: blur(5px); border-radius: 8px; padding: 10px;
+            display: flex; align-items: center; gap: 8px; color: var(--paper);
+            font-size: 0.85rem; transition: all 0.25s ease; position: relative;
+            cursor: pointer; user-select: none;
+            box-shadow: inset 0 1px 3px rgba(255,255,255,0.06);
+        }
+        .game-card:hover {
+            background: color-mix(in srgb, var(--accent) 8%, rgba(255,255,255,0.05));
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 0 25px color-mix(in srgb, var(--accent) 35%, transparent), inset 0 2px 8px rgba(255,255,255,0.15);
+        }
+        .game-card i { font-size: 1rem; color: var(--mute); width: 18px; text-align: center; transition: color 0.2s ease, filter 0.2s ease; }
+        .game-card:hover i { color: var(--accent); filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 50%, transparent)); }
+        .game-card .game-name { flex: 1; word-break: break-word; line-height: 1.3; }
+
+
+        .pin-btn {
+            position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+            background: color-mix(in srgb, var(--ink-800) 80%, transparent); border: 1px solid var(--line);
+            color: var(--paper); font-size: 0.8rem; width: 24px; height: 24px;
+            border-radius: 4px; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; opacity: 0; transition: opacity 0.2s, background 0.2s, border-color 0.2s, box-shadow 0.2s;
+        }
+        .game-card:hover .pin-btn { opacity: 1; }
+        .pin-btn:hover { background: color-mix(in srgb, var(--accent) 20%, var(--ink-800)); border-color: var(--accent); box-shadow: 0 0 15px color-mix(in srgb, var(--accent) 40%, transparent); }
+
+
+        /* Delete button for recent games – matches pin‑btn aesthetic */
+        .delete-recent-btn {
+            position: absolute;
+            right: 6px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: color-mix(in srgb, var(--ink-800) 80%, transparent);
+            border: 1px solid var(--line);
+            color: var(--paper);
+            font-size: 0.8rem;
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            opacity: 0;
+            transition: opacity 0.2s, background 0.2s, border-color 0.2s, box-shadow 0.2s;
+        }
+        .game-card:hover .delete-recent-btn { opacity: 1; }
+        .delete-recent-btn:hover {
+            background: color-mix(in srgb, var(--accent) 20%, var(--ink-800));
+            border-color: var(--accent);
+            box-shadow: 0 0 15px color-mix(in srgb, var(--accent) 40%, transparent);
+        }
+
+
+        /* pinned & recent sections */
+        .top-section {
+            margin-bottom: 28px; border-radius: 10px; padding: 20px 22px;
+            background: color-mix(in srgb, var(--ink-900) 55%, transparent); backdrop-filter: blur(10px);
+            border: 1px solid var(--line);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            transition: border-color 0.6s ease;
+        }
+        .top-header {
+            display: flex; align-items: center; gap: 12px; margin-bottom: 16px;
+            font-family: 'Space Grotesk', sans-serif;
+            font-size: 1.3rem; font-weight: 600; color: var(--paper);
+            border-bottom: 1px solid var(--line); padding-bottom: 8px;
+            text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 35%, transparent);
+            transition: text-shadow 0.8s ease, border-color 0.6s ease;
+        }
+        .top-header i { color: var(--accent); transition: color 0.6s ease; }
+        .recent-expand-btn {
+            background: color-mix(in srgb, var(--ink-900) 60%, transparent); border: 1px solid var(--line);
+            color: var(--paper); padding: 4px 12px; border-radius: 4px;
+            font-size: 0.8rem; cursor: pointer; margin-top: 12px; display: inline-block;
+            transition: 0.2s;
+        }
+        .recent-expand-btn:hover { background: color-mix(in srgb, var(--accent) 14%, var(--ink-800)); color: var(--paper); border-color: var(--accent); box-shadow: 0 0 15px color-mix(in srgb, var(--accent) 35%, transparent); }
+
+
+        .pinned-section .game-card {
+            display: flex; flex-direction: column; align-items: center; text-align: center; padding: 12px 8px;
+        }
+        .pinned-section .game-name { margin-bottom: 10px; font-weight: 500; font-size: 0.8rem; width: 100%; }
+        .pinned-controls { display: flex; gap: 6px; justify-content: center; width: 100%; }
+        .pinned-controls button {
+            background: color-mix(in srgb, var(--ink-800) 85%, transparent); border: 1px solid var(--line);
+            color: var(--paper); border-radius: 4px; width: 28px; height: 28px;
+            cursor: pointer; font-size: 0.75rem; display: flex; align-items: center; justify-content: center;
+            transition: 0.2s;
+        }
+        .pinned-controls button:hover { background: color-mix(in srgb, var(--accent) 18%, var(--ink-800)); color: var(--paper); border-color: var(--accent); box-shadow: 0 0 15px color-mix(in srgb, var(--accent) 35%, transparent); }
+
+
+        .no-games-message { color: var(--mute); font-style: italic; padding: 24px; text-align: center; background: color-mix(in srgb, var(--ink-900) 50%, transparent); border-radius: 6px; border: 1px solid var(--line); font-size: 0.9rem; }
+        ::selection { background: color-mix(in srgb, var(--accent) 35%, transparent); }
+
+
+        @media (max-width: 800px) {
+            .site-container { flex-direction: column; height: calc(100vh - 61px); }
+            .side-nav { width: 100%; height: auto; position: relative; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 16px; gap: 12px; border-right: none; border-bottom: 1px solid var(--line); }
+            .letter-nav { max-height: none; order: 2; width: 100%; justify-content: flex-start; }
+            .search-box { margin-top: 0; order: 3; width: 100%; }
+            .sidebar-footer { display: none; }
+            .main-content { padding: 20px; height: auto; overflow-y: visible; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Intro overlay + spinner -->
+    <div class="intro-overlay" id="introOverlay">
+        <div class="intro-text">
+            <img src="https://cdn.jsdelivr.net/gh/Drowsey-Works/Singlefile-modding@main/DMND%20ACTUALLY%20TRANSPARENT.webp?raw=true" alt="DMND" id="introLogo">
+        </div>
+    </div>
+
+
+    <div class="loading-spinner" id="loadingSpinner">
+        <i class="fas fa-circle-notch"></i>
+        <span>Loading Games...</span>
+    </div>
+
+
+    <!-- main container (61px shorter) -->
+    <div class="site-container">
+        <!-- SIDEBAR -->
+        <nav class="side-nav">
+            <div class="nav-header">
+                <h2 style="display:flex; align-items:center; justify-content:center;">
+                    <a href="https://discord.gg/dP9MgKnDdz" target="_blank">
+                        <img src="https://cdn.jsdelivr.net/gh/Drowsey-Works/Singlefile-modding@main/DMND%20ACTUALLY%20TRANSPARENT.webp?raw=true" width="130">
+                    </a>
+                </h2>
+            </div>
+            <div class="letter-nav" id="letterNav"></div>
+            <div class="search-box">
+                <i class="fas fa-search"></i>
+                <input type="text" id="searchInput" placeholder="Search Games..." autocomplete="off">
+            </div>
+            <div class="sidebar-footer">
+                <a href="https://discord.gg/dP9MgKnDdz" target="_blank"><i class="fa-brands fa-discord"></i> Discord</a>
+            </div>
+        </nav>
+
+
+        <!-- MAIN CONTENT -->
+        <main class="main-content">
+            <div class="main-header">
+                <h1>Games</h1>
+                <div class="discord-link">
+                    <i class="fab fa-discord"></i> <a href="https://discord.gg/dP9MgKnDdz" target="_blank">Join Discord</a>
+                </div>
+            </div>
+            <!-- Sections: pinned, recent, then letters -->
+            <div id="pinned-section-container"></div>
+            <div id="recent-section-container"></div>
+            <div id="letter-sections-container"></div>
+            <div id="statusMessage" style="text-align:center; margin-top:30px; color:#5a5a78;"></div>
+        </main>
+    </div>
+
+
+    <script>
+        (function() {
+            // ---------- W4V3 DYNAMIC ACCENT SYSTEM ----------
+            // Detects local time of day and drives every accent-colored surface
+            // in the stylesheet above via the --accent custom property.
+            const W4V3_ACCENTS = {
+                morning: '#FFA94D',
+                afternoon: '#38D9C9',
+                evening: '#FF6B6B',
+                night: '#5C8DFF',
+                lateNight: '#8B7CFF',
+            };
+            function w4v3GetPeriod(hour) {
+                if (hour < 5) return 'lateNight';
+                if (hour < 12) return 'morning';
+                if (hour < 17) return 'afternoon';
+                if (hour < 21) return 'evening';
+                return 'night';
+            }
+            function w4v3ApplyAccent() {
+                const period = w4v3GetPeriod(new Date().getHours());
+                document.documentElement.style.setProperty('--accent', W4V3_ACCENTS[period]);
+            }
+            w4v3ApplyAccent();
+            setInterval(w4v3ApplyAccent, 60000); // re-check every minute to catch period boundaries
+
+
+            // ---------- LOADING STATE ----------
+            const body = document.body;
+            const introOverlay = document.getElementById('introOverlay');
+            const introLogo = document.getElementById('introLogo');
+            const loadingSpinner = document.getElementById('loadingSpinner');
+            let gamesLoaded = false;
+            let labelsLoaded = false;
+            
+            loadingSpinner.classList.add('show');
+            body.classList.add('intro-active');
+            
+            function checkAllLoaded() {
+                if (gamesLoaded && labelsLoaded) {
+                    setTimeout(() => {
+                        loadingSpinner.classList.remove('show');
+                        introLogo.classList.add('animate');
+                        body.classList.add('loaded');
+                        setTimeout(() => {
+                            body.classList.remove('intro-active');
+                            introOverlay.classList.add('hidden');
+                        }, 1500);
+                    }, 100);
+                }
+            }
+
+
+            // ---------- PINNED / RECENT (localStorage) ----------
+            let pinnedGames = [];
+            let recentGames = [];
+            let recentExpanded = false;
+
+
+            function loadPinned() {
+                try { const stored = localStorage.getItem('pinnedGames'); pinnedGames = stored ? JSON.parse(stored) : []; } catch { pinnedGames = []; }
+            }
+            function loadRecent() {
+                try { const stored = localStorage.getItem('recentGames'); recentGames = stored ? JSON.parse(stored) : []; } catch { recentGames = []; }
+            }
+            function savePinned() { localStorage.setItem('pinnedGames', JSON.stringify(pinnedGames)); }
+            function saveRecent() { localStorage.setItem('recentGames', JSON.stringify(recentGames)); }
+            loadPinned(); loadRecent();
+
+
+            // ---------- DATA & REFERENCES ----------
+            let allGames = []; // { file, label }
+            const pinnedContainer = document.getElementById('pinned-section-container');
+            const recentContainer = document.getElementById('recent-section-container');
+            const lettersContainer = document.getElementById('letter-sections-container');
+            const statusEl = document.getElementById('statusMessage');
+            const letterNav = document.getElementById('letterNav');
+            const searchInput = document.getElementById('searchInput');
+            
+            let currentSearchTerm = '';
+
+
+            // ---------- HELPER: play game (fetch from CDN) ----------
+            function playGame(file) {
+                const normalized = file.includes('.') ? file : file + '.html';
+                const encoded = encodeURIComponent(normalized);
+                fetch(`https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile/UGS-Files/${encoded}?t=${Date.now()}`)
+                    .then(r => r.text())
+                    .then(text => {
+                        const newWin = window.open("about:blank", "_blank");
+                        if (newWin) { newWin.document.open(); newWin.document.write(text); newWin.document.close(); }
+                    });
+            }
+
+
+            // ---------- RECENT & PIN LOGIC ----------
+            function addToRecent(file, label) {
+                recentGames = recentGames.filter(g => g.file !== file);
+                recentGames.unshift({ file, label });
+                if (recentGames.length > 50) recentGames.pop();
+                saveRecent();
+                renderRecentSection();
+            }
+
+
+            function togglePin(file, label) {
+                const index = pinnedGames.findIndex(p => p.file === file);
+                if (index === -1) pinnedGames.unshift({ file, label });
+                else pinnedGames.splice(index, 1);
+                savePinned();
+                renderPinnedSection();
+                updatePinIconsInLetterSections(); // quick icon update in letter cards
+            }
+
+
+            function updatePinIconsInLetterSections() {
+                document.querySelectorAll('#letter-sections-container .game-card').forEach(card => {
+                    const pinBtn = card.querySelector('.pin-btn');
+                    if (!pinBtn) return;
+                    const file = card.dataset.file;
+                    const isPinned = pinnedGames.some(p => p.file === file);
+                    pinBtn.innerHTML = isPinned ? '<i class="fas fa-trash-can"></i>' : '<i class="fas fa-thumbtack"></i>';
+                });
+            }
+
+
+            // ---------- FILTER HELPER (applies search to any array of games) ----------
+            function filterGamesBySearch(gamesArray) {
+                if (!currentSearchTerm.trim()) return gamesArray;
+                const term = currentSearchTerm.toLowerCase();
+                return gamesArray.filter(g => g.label.toLowerCase().includes(term));
+            }
+
+
+            // ---------- RENDER PINNED SECTION ----------
+            function renderPinnedSection() {
+                const filteredPinned = filterGamesBySearch(pinnedGames);
+                let html = '';
+                if (filteredPinned.length === 0 && pinnedGames.length > 0) {
+                    // No pinned match search, but we still show the section with a message? Original hides section if no games after filter.
+                    // We'll hide the entire section if no matches.
+                    pinnedContainer.innerHTML = '';
+                    return;
+                }
+                if (pinnedGames.length === 0) {
+                    pinnedContainer.innerHTML = `
+                        <div class="top-section pinned-section">
+                            <div class="top-header"><i class="fas fa-thumbtack"></i> Pinned Games <span style="font-size:0.8rem; margin-left:auto; color:rgba(255,255,255,0.5);">0</span></div>
+                            <div class="games-grid"><div class="no-games-message">📌 No pinned games yet — hover over any game and click the pin.</div></div>
+                        </div>
+                    `;
+                    return;
+                }
+                let gridHtml = '';
+                filteredPinned.forEach((game, index) => {
+                    gridHtml += `
+                        <div class="game-card" data-file="${game.file}" data-label="${game.label}" style="flex-direction:column; text-align:center;">
+                            <span class="game-name">${game.label}</span>
+                            <div class="pinned-controls">
+                                <button class="move-left" title="move left"><i class="fas fa-chevron-left"></i></button>
+                                <button class="move-right" title="move right"><i class="fas fa-chevron-right"></i></button>
+                                <button class="unpin-btn" title="unpin"><i class="fas fa-trash-can"></i></button>
+                            </div>
+                        </div>
+                    `;
+                });
+                html = `
+                    <div class="top-section pinned-section">
+                        <div class="top-header"><i class="fas fa-thumbtack"></i> Pinned Games <span style="font-size:0.8rem; margin-left:auto; color:rgba(255,255,255,0.5);">${filteredPinned.length}</span></div>
+                        <div class="games-grid">${gridHtml}</div>
+                    </div>
+                `;
+                pinnedContainer.innerHTML = html;
+
+
+                // Attach event listeners
+                pinnedContainer.querySelectorAll('.game-card').forEach((card, idx) => {
+                    const file = card.dataset.file;
+                    const label = card.dataset.label;
+                    // Find the actual index in filteredPinned to get correct global index for move operations
+                    const globalIndex = pinnedGames.findIndex(p => p.file === file);
+                    
+                    card.querySelector('.move-left').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (globalIndex > 0) {
+                            [pinnedGames[globalIndex-1], pinnedGames[globalIndex]] = [pinnedGames[globalIndex], pinnedGames[globalIndex-1]];
+                            savePinned();
+                            renderPinnedSection();
+                            updatePinIconsInLetterSections();
+                        }
+                    });
+                    card.querySelector('.move-right').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        if (globalIndex < pinnedGames.length-1) {
+                            [pinnedGames[globalIndex], pinnedGames[globalIndex+1]] = [pinnedGames[globalIndex+1], pinnedGames[globalIndex]];
+                            savePinned();
+                            renderPinnedSection();
+                            updatePinIconsInLetterSections();
+                        }
+                    });
+                    card.querySelector('.unpin-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        pinnedGames = pinnedGames.filter(p => p.file !== file);
+                        savePinned();
+                        renderPinnedSection();
+                        updatePinIconsInLetterSections();
+                    });
+                    card.addEventListener('click', (e) => {
+                        if (e.target.closest('button')) return;
+                        playGame(file);
+                        addToRecent(file, label);
+                    });
+                });
+            }
+
+
+            // ---------- RENDER RECENT SECTION ----------
+            function renderRecentSection() {
+                const filteredRecent = filterGamesBySearch(recentGames);
+                if (filteredRecent.length === 0 && recentGames.length > 0) {
+                    recentContainer.innerHTML = '';
+                    return;
+                }
+                if (recentGames.length === 0) {
+                    recentContainer.innerHTML = `
+                        <div class="top-section">
+                            <div class="top-header"><i class="fas fa-clock"></i> Recent Games <span style="font-size:0.8rem; margin-left:auto; color:rgba(255,255,255,0.5);">0</span></div>
+                            <div class="games-grid"><div class="no-games-message">🕒 No recent games — click any game to start playing.</div></div>
+                        </div>
+                    `;
+                    return;
+                }
+                const displayGames = recentExpanded ? filteredRecent : filteredRecent.slice(0, 10);
+                let gridHtml = '';
+                displayGames.forEach(game => {
+                    gridHtml += `
+                        <div class="game-card" data-file="${game.file}" data-label="${game.label}">
+                            <i class="fas fa-gamepad"></i>
+                            <span class="game-name">${game.label}</span>
+                            <button class="delete-recent-btn" title="remove from recent"><i class="fas fa-times"></i></button>
+                        </div>
+                    `;
+                });
+                let footerHtml = '';
+                if (recentGames.length > 10) {
+                    footerHtml = `<div style="margin-top:16px; text-align:center;"><span class="recent-expand-btn" id="expandRecentBtn">${recentExpanded ? '🔼 Show less' : '🔽 Show all'}</span></div>`;
+                }
+                recentContainer.innerHTML = `
+                    <div class="top-section">
+                        <div class="top-header"><i class="fas fa-clock"></i> Recent Games <span style="font-size:0.8rem; margin-left:auto; color:rgba(255,255,255,0.5);">${recentGames.length}</span></div>
+                        <div class="games-grid">${gridHtml}</div>
+                        ${footerHtml}
+                    </div>
+                `;
+
+
+                // Attach listeners
+                recentContainer.querySelectorAll('.game-card').forEach(card => {
+                    const file = card.dataset.file;
+                    const label = card.dataset.label;
+                    card.querySelector('.delete-recent-btn').addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        recentGames = recentGames.filter(r => r.file !== file);
+                        saveRecent();
+                        renderRecentSection();
+                    });
+                    card.addEventListener('click', (e) => {
+                        if (e.target.closest('.delete-recent-btn')) return;
+                        playGame(file);
+                        addToRecent(file, label);
+                    });
+                });
+                const expandBtn = document.getElementById('expandRecentBtn');
+                if (expandBtn) {
+                    expandBtn.addEventListener('click', () => {
+                        recentExpanded = !recentExpanded;
+                        renderRecentSection();
+                    });
+                }
+            }
+
+
+            // ---------- RENDER LETTER SECTIONS (from allGames) ----------
+            function renderLetterSections() {
+                if (!allGames.length) return;
+                const filteredAll = filterGamesBySearch(allGames);
+                if (filteredAll.length === 0) {
+                    lettersContainer.innerHTML = `<div class="no-games-message">✨ No games match your search</div>`;
+                    updateLetterNav([]);
+                    return;
+                }
+
+
+                // Group by first letter
+                const groups = {};
+                filteredAll.forEach(game => {
+                    const letter = game.label[0].toUpperCase();
+                    if (!groups[letter]) groups[letter] = [];
+                    groups[letter].push(game);
+                });
+                const sortedLetters = Object.keys(groups).sort((a,b) => a.localeCompare(b));
+                let html = '';
+                sortedLetters.forEach(letter => {
+                    html += `<div class="letter-section" data-letter="${letter}">`;
+                    html += `<div class="letter-header"><span>${letter}</span><hr></div>`;
+                    html += `<div class="games-grid">`;
+                    groups[letter].forEach(game => {
+                        const isPinned = pinnedGames.some(p => p.file === game.file);
+                        const pinIcon = isPinned ? 'fa-trash-can' : 'fa-thumbtack';
+                        html += `
+                            <div class="game-card" data-file="${game.file}" data-label="${game.label}">
+                                <i class="fas fa-gamepad"></i>
+                                <span class="game-name">${game.label}</span>
+                                <button class="pin-btn" title="pin/unpin"><i class="fas ${pinIcon}"></i></button>
+                            </div>
+                        `;
+                    });
+                    html += `</div></div>`;
+                });
+                lettersContainer.innerHTML = html;
+
+
+                // Attach listeners
+                lettersContainer.querySelectorAll('.game-card').forEach(card => {
+                    const file = card.dataset.file;
+                    const label = card.dataset.label;
+                    const pinBtn = card.querySelector('.pin-btn');
+                    pinBtn.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        togglePin(file, label);
+                    });
+                    card.addEventListener('click', (e) => {
+                        if (e.target.closest('.pin-btn')) return;
+                        playGame(file);
+                        addToRecent(file, label);
+                    });
+                });
+
+
+                updateLetterNav(sortedLetters);
+            }
+
+
+            // ---------- UPDATE LETTER NAVIGATION ----------
+            function updateLetterNav(lettersPresent) {
+                const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('');
+                letterNav.innerHTML = '';
+                alphabet.forEach(letter => {
+                    const hasGames = lettersPresent.includes(letter);
+                    const btn = document.createElement('div');
+                    btn.className = `letter-btn ${hasGames ? '' : 'empty-letter'}`;
+                    btn.textContent = letter;
+                    if (hasGames) {
+                        btn.setAttribute('data-letter', letter);
+                        btn.addEventListener('click', () => {
+                            const section = document.querySelector(`.letter-section[data-letter="${letter}"]`);
+                            if (section) section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        });
+                    }
+                    letterNav.appendChild(btn);
+                });
+            }
+
+
+            // ---------- FULL RENDER (triggered after data load and on search) ----------
+            function renderAll() {
+                renderPinnedSection();
+                renderRecentSection();
+                renderLetterSections();
+            }
+
+
+            // ---------- SCRIPT LOADING (games.js → label handler) ----------
+            function loadGamesAndLabels() {
+                statusEl.textContent = '📦 loading game stash...';
+
+
+                // Remove any previously created button sections (from games.js)
+                const oldSections = document.querySelectorAll('.letter-section');
+                oldSections.forEach(s => s.remove());
+
+
+                // Load games.js first
+                const gameScript = document.createElement('script');
+                gameScript.src = 'https://cdn.jsdelivr.net/gh/bubbls/ugs-singlefile@main/games.js';
+                gameScript.async = true;
+                gameScript.onload = () => {
+                    // games.js has created the button sections – now load label handler
+                    const labelScript = document.createElement('script');
+                    labelScript.src = 'https://cdn.jsdelivr.net/gh/Drowsey-Works/Singlefile-modding@main/game-label-handler.js';
+                    labelScript.async = true;
+                    labelScript.onload = () => {
+                        // label handler has populated window.gameLabels from the buttons
+                        if (window.gameLabels && Object.keys(window.gameLabels).length > 0) {
+                            allGames = Object.keys(window.gameLabels).map(file => ({ file, label: window.gameLabels[file] }));
+                            allGames.sort((a,b) => a.label.localeCompare(b.label));
+                            // Remove the original button sections (they are no longer needed)
+                            const generatedSections = document.querySelectorAll('.letter-section');
+                            generatedSections.forEach(s => s.remove());
+                            renderAll();
+                            statusEl.textContent = '';
+                        } else {
+                            statusEl.textContent = '⚠️ no game labels found.';
+                        }
+                        labelsLoaded = true;
+                        checkAllLoaded();
+                    };
+                    labelScript.onerror = () => {
+                        statusEl.textContent = '⚠️ failed to load labels.';
+                        labelsLoaded = true;
+                        checkAllLoaded();
+                    };
+                    document.body.appendChild(labelScript);
+                    gamesLoaded = true;
+                    checkAllLoaded();
+                };
+                gameScript.onerror = () => {
+                    statusEl.textContent = '⚠️ failed to load games.';
+                    gamesLoaded = true;
+                    labelsLoaded = true;
+                    checkAllLoaded();
+                    lettersContainer.innerHTML = '<div class="no-games-message">could not load data. refresh?</div>';
+                };
+                document.body.appendChild(gameScript);
+            }
+
+
+            // Start loading
+            loadGamesAndLabels();
+
+
+            // ---------- SEARCH LISTENER ----------
+            let debounceTimer;
+            searchInput.addEventListener('input', () => {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(() => {
+                    currentSearchTerm = searchInput.value;
+                    renderAll();
+                }, 150);
+            });
+        })();
+    </script>
+</body>
+</html>
